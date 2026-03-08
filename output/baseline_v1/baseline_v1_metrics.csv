@@ -1,0 +1,2 @@
+tl_calm,ts_calm,tl_stress,ts_stress,allow_long_stress,long_etf,short_etf,cooldown,delay,tcost_bps,w_long,w_short,w_initial,ann_ret,vol,sharpe,sortino,mdd,calmar,excess,bm_ann,total_ret,n_days,n_events
+-3.5,3.0,-4.0,99,False,TLT,SHV,5,1,5,1.0,0.0,0.5,0.040635286187121755,0.09459018167732015,0.2181546310748811,0.25123069005962945,-0.23607758712951366,0.1721268277993242,0.03841348330753602,0.0022218028795857325,0.9735234064226401,4301,19

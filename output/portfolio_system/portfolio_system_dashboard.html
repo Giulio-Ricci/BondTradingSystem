@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Portfolio Optimization & Trading System</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+    .header {
+        background: linear-gradient(135deg, #1a3a6a, #2980b9);
+        color: white; padding: 20px 30px; text-align: center;
+    }
+    .header h1 { margin: 0; font-size: 24px; }
+    .header p { margin: 5px 0 0; opacity: 0.8; font-size: 14px; }
+    .tab-bar {
+        display: flex; background: #2c3e50; padding: 0;
+        border-bottom: 3px solid #1a3a6a;
+    }
+    .tab-btn {
+        padding: 12px 20px; cursor: pointer; color: #bdc3c7;
+        font-size: 13px; font-weight: bold; border: none;
+        background: transparent; transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #34495e; color: white; }
+    .tab-btn.active { background: #1a3a6a; color: white; border-bottom: 3px solid #3498db; }
+    .tab-frame {
+        width: 100%; height: calc(100vh - 110px); border: none;
+        background: white;
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Portfolio Optimization & Trading System</h1>
+    <p>25 Curve Strategies | Markowitz Optimization | Indicator-Based Tilt | Walk-Forward Validation</p>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab(event, 0)">Combination Frontier</button>
+    <button class="tab-btn" onclick="switchTab(event, 1)">Correlation & Clustering</button>
+    <button class="tab-btn" onclick="switchTab(event, 2)">Rolling Markowitz</button>
+    <button class="tab-btn" onclick="switchTab(event, 3)">Trading Indicators</button>
+    <button class="tab-btn" onclick="switchTab(event, 4)">System Performance</button>
+    <button class="tab-btn" onclick="switchTab(event, 5)">Walk-Forward + Attribution</button>
+</div>
+
+<iframe id="frame0" src="tab1_combination_frontier.html" class="tab-frame" style="display:block"></iframe>
+<iframe id="frame1" src="tab2_correlation.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame2" src="tab3_rolling_markowitz.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame3" src="tab4_indicators.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame4" src="tab5_system_performance.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame5" src="tab6_walkforward_attribution.html" class="tab-frame" style="display:none"></iframe>
+
+
+<script>
+function switchTab(evt, idx) {
+    var frames = document.querySelectorAll('.tab-frame');
+    for (var i = 0; i < frames.length; i++) {
+        frames[i].style.display = 'none';
+    }
+    var buttons = document.querySelectorAll('.tab-btn');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('active');
+    }
+    document.getElementById('frame' + idx).style.display = 'block';
+    evt.currentTarget.classList.add('active');
+}
+</script>
+
+</body>
+</html>

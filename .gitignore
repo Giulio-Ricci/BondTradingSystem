@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.venv/
+env/
+venv/
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Large optimization CSV (can be regenerated)
+output/optimization/full_optimization_results.csv
+output/final/deep_grid_results.csv

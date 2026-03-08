@@ -1,0 +1,225 @@
+================================================================================
+  RR DURATION STRATEGY - COMPLETE DOCUMENTATION
+  Composite Best Configuration
+================================================================================
+
+1. STRATEGY OVERVIEW
+--------------------------------------------------------------------------------
+
+The RR Duration Strategy is a systematic bond duration timing strategy
+that uses options-implied Risk Reversal (RR) z-scores combined with
+yield curve slope momentum to generate LONG/SHORT signals on US Treasury
+duration exposure.
+
+The strategy alternates between:
+  - LONG position  -> 100% TLT (iShares 20+ Year Treasury Bond ETF)
+  - SHORT position -> 100% SHV (iShares Short Treasury Bond ETF)
+  - NEUTRAL        -> 50% TLT / 50% SHV (initial & default)
+
+The logic: when the options market prices extreme put skew on Treasuries
+(negative z-score = market expects bond prices to fall), the strategy
+goes SHORT duration (into SHV). When call skew is extreme (positive
+z-score = market expects bond prices to rise), it goes LONG duration
+(into TLT). The yield curve slope momentum acts as a confirmation
+signal, improving timing.
+
+2. SIGNAL CONSTRUCTION
+--------------------------------------------------------------------------------
+
+2.1 Base Signal: ALL-tenor RR z-score (z_base)
+
+  Step 1: Compute Risk Reversal for each tenor
+    RR(tenor) = Put_IV(25-delta) - Call_IV(25-delta)
+    Tenors used: 1W, 1M, 3M, 6M
+
+  Step 2: Average across all 4 tenors
+    RR_all = mean(RR_1W, RR_1M, RR_3M, RR_6M)
+
+  Step 3: Standard rolling z-score (window = 63 trading days)
+    mu_63 = rolling_mean(RR_all, window=63, min_periods=20)
+    sigma_63 = rolling_std(RR_all, window=63, min_periods=20)
+    z_base = (RR_all - mu_63) / sigma_63
+
+  NOTE: 63-day window (~3 months) was selected via exhaustive grid
+  search over [50, 63, 80, 125, 180, 250, 375, 504] days.
+  The ALL-tenor blend outperformed single-tenor variants.
+
+2.2 Slope Momentum Component (z_slope)
+
+  Step 1: Compute yield curve slope
+    slope = US_10Y_yield - US_2Y_yield
+
+  Step 2: Compute 126-day change (slope momentum)
+    delta_slope = slope(t) - slope(t - 126)
+
+  Step 3: Z-score the slope change
+    mu_252 = rolling_mean(delta_slope, window=252, min_periods=63)
+    sigma_252 = rolling_std(delta_slope, window=252, min_periods=63)
+    z_slope = (delta_slope - mu_252) / sigma_252
+
+  RATIONALE: When the yield curve is steepening faster than usual
+  (positive z_slope), it confirms risk-off moves. When flattening
+  faster (negative z_slope), it confirms risk-on / duration demand.
+
+2.3 Composite Signal
+
+  z_composite = z_base + k * z_slope
+
+  Where k = 0.50 (slope momentum weight)
+
+  The slope momentum adds directional bias:
+  - If RR is already negative AND slope is steepening -> stronger SHORT
+  - If RR is positive AND slope is flattening -> stronger LONG
+  - Conflicting signals partially cancel out -> fewer false triggers
+
+3. REGIME DETECTION
+--------------------------------------------------------------------------------
+
+  A 2-state Gaussian Hidden Markov Model (HMM) classifies each day
+  as CALM or STRESS based on:
+    - log(MOVE Index)  [bond volatility]
+    - log(VIX)         [equity volatility]
+
+  HMM parameters:
+    - n_components = 2
+    - covariance_type = 'full'
+    - n_iter = 300
+    - n_seeds = 10 (best log-likelihood selected)
+
+  The state with higher average MOVE is labeled STRESS.
+  Typical distribution: CALM ~69%, STRESS ~31%.
+
+  The regime affects which thresholds are used for signal generation.
+  In STRESS, only SHORT signals are allowed (no LONG), and the
+  SHORT threshold is more extreme (harder to trigger).
+
+4. TRADING RULES
+--------------------------------------------------------------------------------
+
+  4.1 Signal Thresholds
+
+    CALM regime:
+      z_composite <= -3.25  ->  SHORT (go to 100% SHV)
+      z_composite >= +2.75  ->  LONG  (go to 100% TLT)
+
+    STRESS regime:
+      z_composite <= -4.00  ->  SHORT (go to 100% SHV)
+      (no LONG signals allowed in STRESS)
+
+  4.2 Position Management
+
+    Initial position: 50% TLT / 50% SHV
+    After LONG signal:  100% TLT / 0% SHV
+    After SHORT signal: 0% TLT / 100% SHV
+
+    Position is held (forward-filled) until the next signal.
+    There is no target/stop-loss exit; the next signal reverses.
+
+  4.3 Execution Parameters
+
+    Cooldown:          5 trading days between signals
+    Execution delay:   1 trading day(s) after signal
+    Transaction cost:  5 basis points per rebalance
+
+    The cooldown prevents signal clustering: after a trade, the
+    strategy ignores new signals for 5 days.
+
+    The execution delay models real-world implementation: a signal
+    generated at close on day T is executed at close on day T+2.
+
+5. PERFORMANCE SUMMARY
+--------------------------------------------------------------------------------
+
+  Backtest period:  2009-01-02 to 2026-02-19
+  Trading days:     4301
+  Years:            17.1
+
+  Sharpe Ratio:     0.3249
+  Sortino Ratio:    0.3987
+  Ann. Return:      0.0539  (5.39%)
+  Volatility:       0.1044  (10.44%)
+  Max Drawdown:     -0.2361  (-23.61%)
+  Calmar Ratio:     0.2283
+  Total Return:     1.4501  (145.01%)
+  Final Equity:     $2.450  (from $1.00)
+
+  Total Events:     52
+    LONG signals:   33
+    SHORT signals:  19
+  Winning trades:   31 (59.6%)
+  Losing trades:    21 (40.4%)
+  Avg trade P&L:    +2.174%
+  Avg winning:      +4.860%
+  Avg losing:       -1.791%
+  Avg holding days: 111
+
+6. YEARLY BREAKDOWN
+--------------------------------------------------------------------------------
+
+    Year    Strategy     B&H TLT      Excess       Vol  Events
+  ----------------------------------------------------------
+    2009     -0.1316     -0.2511     +0.1195    0.0928       0  *
+    2010     +0.0675     +0.0474     +0.0201    0.0539       2  *
+    2011     +0.3147     +0.3147     +0.0000    0.2002       2
+    2012     -0.0089     -0.0089     +0.0000    0.1404       6
+    2013     -0.1594     -0.1594     +0.0000    0.1258       5
+    2014     +0.1946     +0.2362     -0.0416    0.0927       2
+    2015     -0.0319     -0.0424     +0.0106    0.1249       6  *
+    2016     -0.0289     -0.0120     -0.0169    0.0422       7
+    2017     +0.0649     +0.0649     +0.0000    0.0974       0
+    2018     +0.0189     -0.0422     +0.0611    0.0864       5  *
+    2019     +0.1150     +0.1150     +0.0000    0.1196       1
+    2020     +0.2590     +0.1642     +0.0948    0.0861       1  *
+    2021     +0.1114     -0.0581     +0.1695    0.0702       4  *
+    2022     -0.0045     -0.3282     +0.3236    0.0055       2  *
+    2023     +0.1632     -0.0068     +0.1700    0.1033       2  *
+    2024     -0.0019     -0.1168     +0.1149    0.1114       2  *
+    2025     +0.0663     -0.0019     +0.0682    0.0731       3  *
+    2026     +0.0303     +0.0282     +0.0020    0.0699       2  *
+
+  Positive excess years: 11/18 (61%)
+  Average yearly excess: +0.0609
+
+7. DATA SOURCES
+--------------------------------------------------------------------------------
+
+  Options data:   25-delta put/call IV for TY futures (1W, 1M, 3M, 6M)
+  ETF prices:     TLT, SHV (daily close)
+  Yield curve:    US Treasury yields (3M, 2Y, 5Y, 10Y, 30Y)
+  Volatility:     VIX, MOVE Index
+  Period:         2007-01-03 to 2026-02-19
+  Backtest start: 2009-01-01 (sufficient lookback for z-score)
+
+8. PARAMETER SUMMARY TABLE
+--------------------------------------------------------------------------------
+
+  Parameter                      Value                Description
+  --------------------------------------------------------------------------------
+  RR tenors                      1W,1M,3M,6M          All available tenors averaged
+  z_type                         std                  Standard rolling z-score (not MOVE-adjusted)
+  z_window                       63 days              Rolling window for z-score mean/std
+  z_min_periods                  20 days              Minimum observations for rolling calc
+  slope_pair                     10Y - 2Y             Yield curve slope definition
+  slope_mom_window               126 days             Lookback for slope change
+  slope_mom_zscore_win           252 days             Window for z-scoring slope change
+  k (slope weight)               0.50                 Weight of slope momentum in composite
+  tl_calm                        -3.25                SHORT threshold in CALM regime
+  ts_calm                        2.75                 LONG threshold in CALM regime
+  tl_stress                      -4.0                 SHORT threshold in STRESS regime
+  ts_stress                      disabled             No LONG in STRESS
+  cooldown                       5 days               Min gap between consecutive signals
+  execution_delay                1 day(s)             Signal-to-execution lag
+  tcost                          5 bps                One-way transaction cost per rebalance
+  w_initial                      0.5                  Starting allocation (50/50)
+  w_long                         1.0                  TLT weight after LONG signal
+  w_short                        0.0                  TLT weight after SHORT signal (=100% SHV)
+  long_etf                       TLT                  Duration-long instrument
+  short_etf                      SHV                  Duration-short instrument
+  HMM states                     2                    CALM / STRESS
+  HMM features                   log(MOVE),log(VIX)   Input to regime model
+  risk_free_rate                 2.0%                 For Sharpe/Sortino calculation
+
+
+================================================================================
+  Generated: 2026-03-06 17:55
+================================================================================

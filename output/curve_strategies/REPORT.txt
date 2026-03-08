@@ -1,0 +1,382 @@
+================================================================================
+  YIELD CURVE RELATIVE VALUE TRADING SYSTEM
+  Report completo - Metodologia, Implementazione e Risultati
+================================================================================
+
+
+1. OBIETTIVO
+================================================================================
+
+Espansione del sistema di trading duration (TLT vs SHV) a un framework
+completo di relative value sulla curva dei rendimenti US Treasury.
+
+Il sistema:
+  - Definisce 25 strategie multi-leg (spread, butterfly, barbell, direzionali)
+  - Le backtesta tutte su 17 anni di dati (2009-2026)
+  - Analizza la performance per regime di mercato (8 regimi combinati)
+  - Costruisce un meta-sistema che seleziona adattivamente le strategie migliori
+  - Valida out-of-sample con walk-forward (2012-2025)
+
+
+2. DATI UTILIZZATI
+================================================================================
+
+  Periodo:     2009-01-01 -> 2026-02-19 (~17 anni, 4309 trading days)
+  ETF:         SHV (0.4y), SHY (1.9y), IEI (4.4y), IEF (7.5y),
+               TLH (13.0y), TLT (17.5y), GOVT (6.5y)
+  Yields:      US_3M, US_2Y, US_5Y, US_10Y, US_30Y
+  Volatilita': VIX, MOVE
+  Regimi:      HMM (CALM/STRESS), YC (BULL_STEEP/BULL_FLAT/BEAR_STEEP/BEAR_FLAT)
+
+
+3. STRUTTURA DEL CODICE
+================================================================================
+
+  curve_strategies/
+    __init__.py              - Package init
+    strategy_definitions.py  - Pool di 25 strategie con pesi duration-neutral
+    strategy_backtest.py     - Motore di backtest multi-leg
+    regime_analysis.py       - Analisi regimi combinati YC+HMM
+    meta_system.py           - Sistema di selezione adattiva
+    interactive_dashboard.py - Dashboard Plotly con 4 tab
+    run_analysis.py          - Script orchestratore
+
+  Esecuzione: python -m curve_strategies.run_analysis
+
+
+4. LE 25 STRATEGIE
+================================================================================
+
+A) 8 STEEPENER SPREADS (long front-end, short back-end)
+   Profittano quando la curva si irripidisce.
+   Duration-neutral: peso short = -(dur_long / dur_short)
+
+   Adiacenti:
+     - Steep 2s5s:   long SHY / short IEI
+     - Steep 5s10s:  long IEI / short IEF
+     - Steep 10s20s: long IEF / short TLH
+     - Steep 20s30s: long TLH / short TLT
+
+   Ampi:
+     - Steep 2s10s:  long SHY / short IEF
+     - Steep 2s30s:  long SHY / short TLT
+     - Steep 5s30s:  long IEI / short TLT
+     - Steep 10s30s: long IEF / short TLT
+
+B) 4 FLATTENER SPREADS (long back-end, short front-end)
+   Profittano quando la curva si appiattisce.
+
+     - Flat 10s2s:  long IEF / short SHY
+     - Flat 30s2s:  long TLT / short SHY
+     - Flat 30s5s:  long TLT / short IEI
+     - Flat 30s10s: long TLT / short IEF
+
+C) 6 BUTTERFLY (3 strutture x 2 direzioni)
+   Positive = long wings, short body (profittano da aumento curvatura)
+   Negative = short wings, long body (profittano da diminuzione curvatura)
+   Peso body: w_body = -(d_wing1 + d_wing2) / d_body
+
+     - Bfly 2-5-10 +/-:  SHY / IEI / IEF
+     - Bfly 2-10-30 +/-: SHY / IEF / TLT
+     - Bfly 5-10-30 +/-: IEI / IEF / TLT
+
+D) 4 DIREZIONALI (baseline di confronto)
+     - B&H TLT      (100% long duration)
+     - B&H SHV      (100% cash-like)
+     - B&H IEF      (100% intermedio)
+     - 50/50 TLT/SHV (bilanciato)
+
+E) 3 BARBELL (duration-neutral, entrambe le gambe long)
+     - Barbell SHY+TLT  (estremi della curva)
+     - Barbell SHY+IEF  (corto + intermedio)
+     - Barbell IEI+TLT  (intermedio + lungo)
+
+Normalizzazione: tutti i pesi normalizzati a sum(|w|) = 2.0 per rendere
+gli Sharpe ratio comparabili tra strategie con strutture diverse.
+
+
+5. CLASSIFICAZIONE DEI REGIMI
+================================================================================
+
+A) Regime HMM (CALM / STRESS)
+   - Gaussian HMM a 2 stati su log(MOVE) e log(VIX)
+   - CALM:   68.7% del periodo
+   - STRESS: 31.3% del periodo
+
+B) Regime Yield Curve (4 stati)
+   - Basato su variazione a 21gg di livello e spread (2Y-10Y)
+   - BULL_STEEP  (yields giu', spread su):      17.0%
+   - BULL_FLAT   (yields giu', spread giu'):     32.2%
+   - BEAR_STEEP  (yields su, spread su):         31.4%
+   - BEAR_FLAT   (yields su, spread giu'):       19.0%
+   - UNDEFINED:                                   0.4%
+
+C) Regime Combinato (8 stati effettivi)
+   BEAR_FLAT/CALM:     14.2%
+   BEAR_FLAT/STRESS:    4.6%
+   BEAR_STEEP/CALM:    22.7%
+   BEAR_STEEP/STRESS:   8.9%
+   BULL_FLAT/CALM:     22.0%
+   BULL_FLAT/STRESS:   10.4%
+   BULL_STEEP/CALM:     9.7%
+   BULL_STEEP/STRESS:   7.5%
+
+
+6. RISULTATI BACKTEST - TUTTE LE 25 STRATEGIE
+================================================================================
+
+Ranking per Sharpe Ratio (in-sample completo 2009-2026):
+
+  #  Strategia              Tipo           Sharpe  AnnRet     Vol     MDD
+  -- ---------------------- ------------- ------- -------- ------- --------
+   1 B&H TLT                directional   -0.100  -5.52%  30.46%  -79.55%
+   2 B&H IEF                directional   -0.125  -0.64%  13.66%  -48.83%
+   3 Barbell IEI+TLT        barbell       -0.150  -0.42%  11.63%  -44.68%
+   4 50/50 TLT/SHV          directional   -0.165  -1.68%  15.30%  -51.97%
+   5 Steep 10s20s            spread        -0.248  +0.38%   5.85%  -21.22%
+   6 Steep 20s30s            spread        -0.249  -0.84%   9.60%  -39.73%
+   7 Steep 5s30s             spread        -0.330  +0.59%   4.04%  -14.06%
+   8 Steep 10s30s            spread        -0.359  +0.42%   4.15%  -14.07%
+   9 Barbell SHY+IEF         barbell       -0.444  -0.21%   4.74%  -21.53%
+  10 Barbell SHY+TLT         barbell       -0.463  -0.40%   4.94%  -23.22%
+  11 Bfly 2-10-30 -          butterfly     -0.526  +0.38%   2.99%   -8.91%
+  12 Flat 30s10s             spread        -0.608  -0.61%   4.15%  -12.59%
+  13 Bfly 5-10-30 -          butterfly     -0.647  +0.22%   2.69%   -8.56%
+  14 Flat 30s5s              spread        -0.662  -0.76%   4.04%  -13.84%
+  15 Flat 30s2s              spread        -0.716  +0.03%   2.69%   -7.98%
+  16 Steep 2s30s             spread        -0.773  -0.12%   2.69%  -12.11%
+  17 Bfly 2-10-30 +          butterfly     -0.816  -0.48%   2.99%   -9.49%
+  18 Bfly 5-10-30 +          butterfly     -0.845  -0.31%   2.69%   -7.93%
+  19 Flat 10s2s              spread        -0.941  +0.19%   1.90%   -4.44%
+  20 Steep 5s10s             spread        -1.009  +0.24%   1.73%   -4.74%
+  21 Steep 2s10s             spread        -1.168  -0.24%   1.90%   -9.50%
+  22 Bfly 2-5-10 -           butterfly     -1.546  +0.27%   1.12%   -2.65%
+  23 B&H SHV                 directional   -1.606  -0.02%   1.25%   -2.38%
+  24 Steep 2s5s              spread        -1.826  -0.33%   1.27%   -7.59%
+  25 Bfly 2-5-10 +           butterfly     -2.037  -0.29%   1.12%   -5.19%
+
+NOTA: Gli Sharpe negativi delle strategie singole sono normali in un periodo
+(2009-2026) che include il bear market obbligazionario 2020-2023. Il valore
+del sistema sta nella selezione adattiva per regime (meta-system).
+
+
+7. MATRICE REGIME-STRATEGIA (insight chiave)
+================================================================================
+
+La matrice mostra Sharpe per ogni combinazione (strategia, regime).
+I pattern piu' evidenti:
+
+  BULL_FLAT/CALM e BULL_FLAT/STRESS (yields scendono, curva si appiattisce):
+    -> B&H TLT eccelle:       Sharpe +3.12 / +3.67
+    -> Barbell IEI+TLT:       Sharpe +2.85 / +3.75
+    -> Flat 30s10s:            Sharpe -0.61 / -0.41
+    -> Steepeners soffrono:   tutti negativi
+
+  BEAR_STEEP/CALM e BEAR_STEEP/STRESS (yields salgono, curva si irripidisce):
+    -> Steep 20s30s eccelle:  Sharpe +2.31 / +2.50
+    -> Direzionali soffrono:  B&H TLT Sharpe -3.07 / -3.14
+    -> Butterflies negative:  soffrono
+
+  BULL_STEEP (yields scendono, curva si irripidisce):
+    -> Steep 5s30s:           Sharpe +3.98 / +2.67
+    -> Steep 10s30s:          Sharpe +3.94 / +2.48
+    -> Bfly 2-10-30 neg:      Sharpe +3.61 / +2.32
+
+  BEAR_FLAT (yields salgono, curva si appiattisce):
+    -> Flat 30s5s:            Sharpe +2.03
+    -> Flat 30s10s:           Sharpe +2.05
+    -> Bfly 2-10-30 pos:      Sharpe +1.66
+
+Conclusione: nessuna strategia singola funziona in tutti i regimi, ma
+il meta-sistema puo' selezionare la migliore per ogni contesto.
+
+
+8. META-SISTEMA
+================================================================================
+
+Il meta-sistema seleziona le strategie in base al regime corrente.
+
+A) Modalita' LOOKUP (1 strategia per regime):
+
+   Regime              -> Strategia Selezionata
+   -------------------- -----------------------
+   BEAR_FLAT/CALM       -> Flat 30s10s
+   BEAR_FLAT/STRESS     -> Steep 20s30s
+   BEAR_STEEP/CALM      -> Steep 20s30s
+   BEAR_STEEP/STRESS    -> Steep 20s30s
+   BULL_FLAT/CALM       -> B&H TLT
+   BULL_FLAT/STRESS     -> Barbell IEI+TLT
+   BULL_STEEP/CALM      -> Steep 5s30s
+   BULL_STEEP/STRESS    -> Steep 5s30s
+
+   Performance:
+     Sharpe  = 0.8245
+     AnnRet  = +13.46%
+     Vol     = 14.09%
+     MDD     = -14.82%
+     Calmar  = 0.908
+     HitRate = 51.8%
+
+B) Modalita' ENSEMBLE (top-3 strategie pesate per Sharpe):
+
+   Performance:
+     Sharpe  = 0.7260
+     AnnRet  = +9.91%
+     Vol     = 11.11%
+     MDD     = -13.54%
+     Calmar  = 0.732
+     HitRate = 53.0%
+
+Confronto con baseline:
+                    Sharpe   AnnRet    MDD
+   Meta LOOKUP      +0.82   +13.5%   -14.8%
+   Meta ENSEMBLE    +0.73    +9.9%   -13.5%
+   B&H TLT          -0.10    -5.5%   -79.6%
+   B&H IEF           -0.13    -0.6%   -48.8%
+   50/50 TLT/SHV    -0.17    -1.7%   -52.0%
+
+Il meta-sistema trasforma strategie con Sharpe negativi in un portafoglio
+con Sharpe ~0.73-0.82, riducendo il MDD da -79% (B&H TLT) a -13/-15%.
+
+
+9. WALK-FORWARD VALIDATION (Out-of-Sample)
+================================================================================
+
+Training rolling di 3 anni, test su 1 anno. Periodo OOS: 2012-2025.
+
+  A) LOOKUP Walk-Forward:
+
+     Anno   Sharpe   Return    MDD
+     ----  ------   ------   ------
+     2012   +1.22   +11.4%    -3.7%
+     2013   +1.92   +20.7%    -3.3%
+     2014   -0.41    -1.4%    -7.2%
+     2015   +1.00   +11.9%    -7.4%
+     2016   -0.85    -5.9%   -12.5%
+     2017   -0.27    +0.0%    -5.7%
+     2018   +1.45   +10.1%    -4.0%
+     2019   +0.28    +3.9%    -6.8%
+     2020   +0.49    +6.6%    -7.5%
+     2021   +0.15    +3.0%    -6.2%
+     2022   +1.96   +25.8%    -9.1%
+     2023   +1.13   +24.2%   -12.7%
+     2024   +0.33    +5.5%   -10.6%
+     2025   +0.37    +5.7%    -8.1%
+
+     Media OOS Sharpe: +0.627
+     Anni positivi:    11/14 (79%)
+
+  B) ENSEMBLE Walk-Forward:
+
+     Anno   Sharpe   Return    MDD
+     ----  ------   ------   ------
+     2012   +1.67   +13.8%    -3.0%
+     2013   +1.82   +13.7%    -2.2%
+     2014   -0.85    -3.0%    -6.5%
+     2015   +0.77   +10.2%    -9.1%
+     2016   -0.59    -3.7%   -12.2%
+     2017   -0.16    +0.4%    -6.5%
+     2018   +1.15    +8.7%    -5.2%
+     2019   +0.87   +10.2%    -6.5%
+     2020   +0.47    +7.3%   -11.9%
+     2021   +0.43    +6.0%    -5.7%
+     2022   +1.46   +23.3%   -10.7%
+     2023   +0.88   +13.2%    -9.5%
+     2024   +0.02    +1.8%    -7.8%
+     2025   +0.06    +2.2%    -5.9%
+
+     Media OOS Sharpe: +0.571
+     Anni positivi:    11/14 (79%)
+
+Il sistema mantiene Sharpe OOS positivo in media, con solo 3 anni negativi
+su 14 (2014, 2016, 2017). I risultati migliori sono nel 2013 e 2022.
+
+
+10. INTERPRETAZIONE ECONOMICA
+================================================================================
+
+- Il 2022 (Sharpe +1.96 LOOKUP, +1.46 ENSEMBLE) e' l'anno del grande bear
+  market obbligazionario. Il meta-sistema ha correttamente selezionato
+  steepener/flattener invece di strategie direzionali long, proteggendo
+  il portafoglio durante le perdite massive di TLT (-31%).
+
+- Il 2013 (taper tantrum) e' un altro anno eccellente: il sistema ha
+  catturato il repricing della curva.
+
+- 2014 e 2016 sono gli unici anni negativi significativi: periodi di
+  range-bound dove il regime switching genera falsi segnali.
+
+- L'ENSEMBLE e' piu' stabile del LOOKUP (volatilita' piu' bassa, MDD
+  piu' contenuto) ma con rendimenti leggermente inferiori.
+
+
+11. OUTPUT FILES
+================================================================================
+
+  output/curve_strategies/
+    strategy_summary.csv             - Ranking tutte le 25 strategie
+    regime_performance_matrix.csv    - Sharpe per (strategia x regime)
+    regime_transitions.csv           - Matrice transizione tra regimi
+    walk_forward.csv                 - Risultati OOS per anno (LOOKUP + ENSEMBLE)
+    curve_strategies_dashboard.html  - Dashboard interattivo (4 tab)
+    tab1_equity_curves.html          - Equity curves di tutte le strategie
+    tab2_meta_system.html            - Meta-system equity + regimi + allocazioni
+    tab3_regime_heatmap.html         - Heatmap Sharpe strategia x regime
+    tab4_walk_forward.html           - Bar chart Sharpe OOS per anno
+
+
+12. DASHBOARD INTERATTIVO
+================================================================================
+
+Il dashboard HTML ha 4 tab navigate con click:
+
+  Tab 1 - EQUITY CURVES
+    Tutte le 25 equity curves normalizzate a $1, colorate per tipo:
+    blu = steepener, arancio = flattener, verde = butterfly,
+    rosso = direzionale, viola = barbell.
+    Con range slider e zoom interattivo.
+
+  Tab 2 - META-SYSTEM
+    3 pannelli sincronizzati:
+    - Equity del meta-sistema ENSEMBLE nel tempo
+    - Timeline dei regimi combinati (punti colorati)
+    - Allocazione strategica nel tempo (stacked area)
+
+  Tab 3 - REGIME HEATMAP
+    Heatmap con colorscale RdYlGn:
+    - Righe = 25 strategie
+    - Colonne = 8 regimi combinati
+    - Valori = Sharpe ratio
+    - Verde = Sharpe positivo, Rosso = Sharpe negativo
+
+  Tab 4 - WALK-FORWARD
+    Bar chart degli Sharpe OOS per anno (2012-2025):
+    - Barre verdi = Sharpe positivo
+    - Barre rosse = Sharpe negativo
+    - Linea tratteggiata = media
+
+
+13. CONCLUSIONI
+================================================================================
+
+1. NESSUNA strategia singola di relative value genera Sharpe positivo
+   nel periodo completo 2009-2026 (bear market obbligazionario dominante).
+
+2. La MATRICE REGIME-STRATEGIA mostra pattern forti: ogni regime ha
+   strategie che performano bene e altre che soffrono.
+
+3. Il META-SISTEMA sfrutta questi pattern per costruire un portafoglio
+   adattivo con:
+     - Sharpe in-sample:    0.73 (ENSEMBLE) / 0.82 (LOOKUP)
+     - Sharpe out-of-sample: 0.57 (ENSEMBLE) / 0.63 (LOOKUP) medio
+     - MDD ridotto:          -13% vs -80% di B&H TLT
+     - Positivo in 11/14 anni OOS
+
+4. Il sistema e' robusto: il walk-forward conferma la validita' della
+   selezione per regime, con rendimento OOS positivo nella grande
+   maggioranza degli anni.
+
+5. L'ENSEMBLE e' preferibile al LOOKUP per uso pratico: meno volatile,
+   piu' diversificato, MDD leggermente inferiore.
+
+================================================================================

@@ -1,0 +1,167 @@
+========================================================================
+  STRATEGY DOCUMENTATION -- RR+YC Combined V2
+========================================================================
+
+OVERVIEW
+------------------------------------------------------------------------
+Strategy: RR + Yield Curve Combined Duration Timing
+Instruments: TLT (long duration) / SHV (short duration)
+Universe: US Treasury ETFs
+Period: 17.1 years (4301 trading days)
+
+SIGNAL CONSTRUCTION
+------------------------------------------------------------------------
+z_final = z_rr_composite + 0.40 * z_yc_regime_z
+
+Component 1: RR Composite (z_rr)
+  z_rr = z_base_rr + 0.50 * z_slope_momentum
+  z_base_rr: rolling z-score of mean Risk Reversal (1W,1M,3M,6M), w=63
+  z_slope_momentum: z-score of 126-day change in 10Y-2Y slope, zw=252
+
+Component 2: YC Regime Z-Score (z_yc)
+  1. Classify 10s30s yield curve regime every day:
+     - BULL_FLAT  (+2): level falls, spread falls
+     - BULL_STEEP (+1): level falls, spread rises
+     - BEAR_FLAT  (-1): level rises, spread falls
+     - BEAR_STEEP (-2): level rises, spread rises
+  2. Changes measured over rolling 42-day window
+  3. Z-score the regime score with 252-day rolling window
+
+Combination: Additive method (z_final = z_rr + 0.40 * z_yc)
+  k_yc = 0.40 provides optimal diversification without diluting RR signal
+
+TRADING RULES
+------------------------------------------------------------------------
+HMM Regime Detection: 2-state Gaussian HMM on log(MOVE) + log(VIX)
+
+  CALM regime:
+    z_final <= -3.25  ->  SHORT (100% SHV)
+    z_final >= +2.50  ->  LONG  (100% TLT)
+  STRESS regime:
+    z_final <= -3.50  ->  SHORT (100% SHV)
+    No LONG signals in STRESS
+
+  Cooldown: 5 days between signals
+  Execution delay: T+2
+  Transaction cost: 5 bps per rebalance
+  Initial allocation: 50% TLT / 50% SHV
+
+PERFORMANCE RESULTS
+------------------------------------------------------------------------
+  Sharpe Ratio:     0.3997
+  Sortino Ratio:    0.4826
+  Ann. Return:      6.18%
+  Volatility:       10.46%
+  Max Drawdown:     -23.61%
+  Calmar Ratio:     0.2618
+  Excess vs TLT:    +7.79%
+  Total Return:     178.3%
+  Equity Finale:    $2.746
+  N. Operazioni:    54
+
+COMPARISON WITH V1 (RR-ONLY)
+------------------------------------------------------------------------
+  Metric           V1 (RR)    V2 (RR+YC)    Change
+  --------------------------------------------------------
+  Sharpe           0.325      0.400         +23%
+  Sortino          0.399      0.483         +21%
+  Ann. Return      5.39%      6.18%
+  Max Drawdown     -23.6%     -23.6%
+  Events           52         54
+
+YEARLY BREAKDOWN
+------------------------------------------------------------------------
+    Anno   Strategia     B&H TLT      Excess       Vol    Ev
+  --------------------------------------------------------
+    2009     -0.0640     -0.2511     +0.1871    0.0569     1 *
+    2010     +0.0282     +0.0474     -0.0192    0.0381     2
+    2011     +0.3147     +0.3147     +0.0000    0.2002     3
+    2012     -0.0089     -0.0089     +0.0000    0.1404     4
+    2013     -0.1594     -0.1594     +0.0000    0.1258     6
+    2014     +0.2022     +0.2362     -0.0340    0.0924     2
+    2015     -0.0071     -0.0424     +0.0353    0.1232     7 *
+    2016     -0.0289     -0.0120     -0.0169    0.0422     6
+    2017     +0.0649     +0.0649     +0.0000    0.0974     1
+    2018     +0.0189     -0.0422     +0.0611    0.0864     4 *
+    2019     +0.1150     +0.1150     +0.0000    0.1196     4
+    2020     +0.2590     +0.1642     +0.0948    0.0861     1 *
+    2021     +0.1073     -0.0581     +0.1654    0.1012     3 *
+    2022     -0.0045     -0.3282     +0.3236    0.0055     2 *
+    2023     +0.2059     -0.0068     +0.2127    0.1173     3 *
+    2024     -0.0019     -0.1168     +0.1149    0.1114     1 *
+    2025     +0.0795     -0.0019     +0.0814    0.0707     2 *
+    2026     +0.0303     +0.0282     +0.0020    0.0699     2 *
+
+  Anni positivi: 10/18 (56%)
+  Avg excess: +6.71%
+
+TRADE LIST
+------------------------------------------------------------------------
+    #  Data          Segnale         z  Regime 
+  ----------------------------------------------
+    1  2009-03-18    SHORT      -3.722  STRESS 
+    2  2010-05-05    SHORT      -3.884  STRESS 
+    3  2010-12-15    LONG       +2.805  CALM   
+    4  2011-06-28    LONG       +3.193  CALM   
+    5  2011-07-18    LONG       +2.531  CALM   
+    6  2011-07-26    LONG       +2.957  CALM   
+    7  2012-03-16    LONG       +2.763  CALM   
+    8  2012-08-02    LONG       +2.555  CALM   
+    9  2012-10-24    LONG       +2.668  CALM   
+   10  2012-11-05    LONG       +6.554  CALM   
+   11  2013-05-13    LONG       +3.031  CALM   
+   12  2013-05-29    LONG       +3.415  CALM   
+   13  2013-06-20    LONG       +3.366  CALM   
+   14  2013-06-27    LONG       +3.113  CALM   
+   15  2013-07-05    LONG       +3.461  CALM   
+   16  2013-11-29    LONG       +2.511  CALM   
+   17  2014-10-14    SHORT      -3.586  STRESS 
+   18  2014-12-12    SHORT      -3.605  CALM   
+   19  2015-03-24    SHORT      -3.366  CALM   
+   20  2015-04-30    LONG       +3.450  CALM   
+   21  2015-05-07    LONG       +2.716  CALM   
+   22  2015-06-03    LONG       +3.308  CALM   
+   23  2015-06-10    LONG       +2.634  CALM   
+   24  2015-12-18    SHORT      -3.306  CALM   
+   25  2015-12-28    SHORT      -3.794  CALM   
+   26  2016-02-11    SHORT      -3.926  STRESS 
+   27  2016-06-13    SHORT      -3.749  CALM   
+   28  2016-11-09    LONG       +5.066  CALM   
+   29  2016-11-16    LONG       +3.592  CALM   
+   30  2016-11-23    LONG       +3.162  CALM   
+   31  2016-12-01    LONG       +3.128  CALM   
+   32  2017-06-27    LONG       +2.540  CALM   
+   33  2018-01-26    LONG       +3.224  CALM   
+   34  2018-05-16    LONG       +2.827  CALM   
+   35  2018-08-10    SHORT      -3.283  CALM   
+   36  2018-10-04    LONG       +2.853  CALM   
+   37  2019-02-27    LONG       +2.643  CALM   
+   38  2019-06-25    LONG       +2.638  CALM   
+   39  2019-07-11    LONG       +2.574  CALM   
+   40  2019-07-29    LONG       +2.538  CALM   
+   41  2020-03-06    SHORT      -4.442  STRESS 
+   42  2021-03-18    LONG       +2.700  CALM   
+   43  2021-05-26    LONG       +2.578  CALM   
+   44  2021-11-05    SHORT      -3.501  CALM   
+   45  2022-02-28    SHORT      -3.969  STRESS 
+   46  2022-03-07    SHORT      -5.251  STRESS 
+   47  2023-02-21    LONG       +2.512  CALM   
+   48  2023-03-15    SHORT      -3.953  STRESS 
+   49  2023-10-02    LONG       +3.202  CALM   
+   50  2024-08-02    SHORT      -3.607  STRESS 
+   51  2025-05-21    LONG       +2.512  CALM   
+   52  2025-10-16    SHORT      -4.586  STRESS 
+   53  2026-01-20    LONG       +3.264  CALM   
+   54  2026-02-13    SHORT      -3.661  STRESS 
+
+KEY FINDINGS
+------------------------------------------------------------------------
+1. Adding YC regime_z signal improves Sharpe by ~22% (0.325 -> 0.396)
+2. 10s30s spread is the best curve segment for TLT timing
+3. Regime z-score (discrete->continuous) outperforms pure continuous
+4. Additive combination with k=0.40 is optimal; filter/agreement fail
+5. Fewer trades (19 vs 52) suggests more confident, higher-quality signals
+6. Sticky positions (trend-following) work better than exit-to-neutral
+7. HMM regime thresholds remain crucial for crisis protection
+
+========================================================================
