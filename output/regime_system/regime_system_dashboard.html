@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Curve Regime System - Dashboard</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+    .header {
+        background: linear-gradient(135deg, #8e44ad, #3498db);
+        color: white; padding: 20px 30px; text-align: center;
+    }
+    .header h1 { margin: 0; font-size: 24px; }
+    .header p { margin: 5px 0 0; opacity: 0.8; font-size: 14px; }
+    .tab-bar {
+        display: flex; background: #2c3e50; padding: 0;
+        border-bottom: 3px solid #8e44ad;
+    }
+    .tab-btn {
+        padding: 12px 20px; cursor: pointer; color: #bdc3c7;
+        font-size: 13px; font-weight: bold; border: none;
+        background: transparent; transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #34495e; color: white; }
+    .tab-btn.active { background: #8e44ad; color: white; border-bottom: 3px solid #e74c3c; }
+    .tab-frame {
+        width: 100%; height: calc(100vh - 110px); border: none;
+        background: white;
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Curve Regime System</h1>
+    <p>Multi-Mode Regime-Adaptive Strategy Selection | 6 Modes | Walk-Forward Validation</p>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab(event, 0)">Mode Equity</button>
+    <button class="tab-btn" onclick="switchTab(event, 1)">Mode-Regime Matrix</button>
+    <button class="tab-btn" onclick="switchTab(event, 2)">Adaptive System</button>
+    <button class="tab-btn" onclick="switchTab(event, 3)">Yearly Breakdown</button>
+    <button class="tab-btn" onclick="switchTab(event, 4)">Risk Dashboard</button>
+    <button class="tab-btn" onclick="switchTab(event, 5)">Walk-Forward</button>
+</div>
+
+<iframe id="frame0" src="tab1_mode_equity.html" class="tab-frame" style="display:block"></iframe>
+<iframe id="frame1" src="tab2_mode_regime.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame2" src="tab3_adaptive.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame3" src="tab4_yearly.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame4" src="tab5_risk.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame5" src="tab6_walkforward.html" class="tab-frame" style="display:none"></iframe>
+
+
+<script>
+function switchTab(evt, idx) {
+    var frames = document.querySelectorAll('.tab-frame');
+    for (var i = 0; i < frames.length; i++) {
+        frames[i].style.display = 'none';
+    }
+    var buttons = document.querySelectorAll('.tab-btn');
+    for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('active');
+    }
+    document.getElementById('frame' + idx).style.display = 'block';
+    evt.currentTarget.classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -1,11 +1,11 @@
 """
-strategy_definitions.py - Pool of 25 yield curve relative value strategies.
+strategy_definitions.py - Pool of 46 yield curve relative value strategies.
 
 Strategy types:
     A) 8 Steepener spreads  (long front, short back)
-    B) 4 Flattener spreads  (long back, short front)
-    C) 6 Butterfly          (3 structures x 2 directions)
-    D) 4 Directional        (baseline B&H)
+    B) 8 Flattener spreads  (long back, short front) - mirror of every steepener
+    C) 20 Butterfly         (10 structures x 2 directions pos/neg)
+    D) 7 Directional        (all ETFs B&H + 50/50 blend)
     E) 3 Barbell            (duration-neutral long/short mix)
 """
 
@@ -126,7 +126,7 @@ def _make_barbell(name, display, short_etf, long_etf, desc):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# STRATEGY POOL (25 strategies)
+# STRATEGY POOL (46 strategies)
 # ══════════════════════════════════════════════════════════════════════════
 
 STRATEGY_POOL = []
@@ -147,44 +147,99 @@ _steepeners = [
 for name, display, long_e, short_e, direction, desc in _steepeners:
     STRATEGY_POOL.append(_make_spread(name, display, long_e, short_e, direction, desc))
 
-# ── B) 4 Flattener spreads (long back, short front) ─────────────────────
+# ── B) 8 Flattener spreads (long back, short front) ─────────────────────
+#     Exact mirror of every steepener: same name scheme, opposite direction
 _flatteners = [
-    ("flat_10s2s",  "Flat 10s2s",  "IEF", "SHY", "flattener", "Flattener: long IEF / short SHY (10s2s)"),
-    ("flat_30s2s",  "Flat 30s2s",  "TLT", "SHY", "flattener", "Flattener: long TLT / short SHY (30s2s)"),
-    ("flat_30s5s",  "Flat 30s5s",  "TLT", "IEI", "flattener", "Flattener: long TLT / short IEI (30s5s)"),
-    ("flat_30s10s", "Flat 30s10s", "TLT", "IEF", "flattener", "Flattener: long TLT / short IEF (30s10s)"),
+    # Adjacent (inverse of steep adjacent)
+    ("flat_2s5s",   "Flat 2s5s",   "IEI", "SHY", "flattener", "Flattener: long IEI / short SHY (2s5s adjacent)"),
+    ("flat_5s10s",  "Flat 5s10s",  "IEF", "IEI", "flattener", "Flattener: long IEF / short IEI (5s10s adjacent)"),
+    ("flat_10s20s", "Flat 10s20s", "TLH", "IEF", "flattener", "Flattener: long TLH / short IEF (10s20s adjacent)"),
+    ("flat_20s30s", "Flat 20s30s", "TLT", "TLH", "flattener", "Flattener: long TLT / short TLH (20s30s adjacent)"),
+    # Wide (inverse of steep wide)
+    ("flat_2s10s",  "Flat 2s10s",  "IEF", "SHY", "flattener", "Flattener: long IEF / short SHY (2s10s wide)"),
+    ("flat_2s30s",  "Flat 2s30s",  "TLT", "SHY", "flattener", "Flattener: long TLT / short SHY (2s30s wide)"),
+    ("flat_5s30s",  "Flat 5s30s",  "TLT", "IEI", "flattener", "Flattener: long TLT / short IEI (5s30s wide)"),
+    ("flat_10s30s", "Flat 10s30s", "TLT", "IEF", "flattener", "Flattener: long TLT / short IEF (10s30s wide)"),
 ]
 for name, display, long_e, short_e, direction, desc in _flatteners:
     STRATEGY_POOL.append(_make_spread(name, display, long_e, short_e, direction, desc))
 
-# ── C) 6 Butterfly (3 structures x 2 directions) ────────────────────────
+# ── C) 20 Butterfly (10 structures x 2 directions) ───────────────────────
+#     All possible 3-tenor combinations from SHY/IEI/IEF/TLH/TLT
 _butterflies = [
-    ("bfly_2s5s10s_pos",  "Bfly 2-5-10 +", "SHY", "IEI", "IEF", "positive",
+    # 2s5s10s
+    ("bfly_2s5s10s_pos",   "Bfly 2-5-10 +",   "SHY", "IEI", "IEF", "positive",
      "Positive butterfly 2s5s10s: long wings (SHY+IEF), short body (IEI)"),
-    ("bfly_2s5s10s_neg",  "Bfly 2-5-10 -", "SHY", "IEI", "IEF", "negative",
+    ("bfly_2s5s10s_neg",   "Bfly 2-5-10 -",   "SHY", "IEI", "IEF", "negative",
      "Negative butterfly 2s5s10s: short wings (SHY+IEF), long body (IEI)"),
-    ("bfly_2s10s30s_pos", "Bfly 2-10-30 +", "SHY", "IEF", "TLT", "positive",
+    # 2s5s20s
+    ("bfly_2s5s20s_pos",   "Bfly 2-5-20 +",   "SHY", "IEI", "TLH", "positive",
+     "Positive butterfly 2s5s20s: long wings (SHY+TLH), short body (IEI)"),
+    ("bfly_2s5s20s_neg",   "Bfly 2-5-20 -",   "SHY", "IEI", "TLH", "negative",
+     "Negative butterfly 2s5s20s: short wings (SHY+TLH), long body (IEI)"),
+    # 2s5s30s
+    ("bfly_2s5s30s_pos",   "Bfly 2-5-30 +",   "SHY", "IEI", "TLT", "positive",
+     "Positive butterfly 2s5s30s: long wings (SHY+TLT), short body (IEI)"),
+    ("bfly_2s5s30s_neg",   "Bfly 2-5-30 -",   "SHY", "IEI", "TLT", "negative",
+     "Negative butterfly 2s5s30s: short wings (SHY+TLT), long body (IEI)"),
+    # 2s10s20s
+    ("bfly_2s10s20s_pos",  "Bfly 2-10-20 +",  "SHY", "IEF", "TLH", "positive",
+     "Positive butterfly 2s10s20s: long wings (SHY+TLH), short body (IEF)"),
+    ("bfly_2s10s20s_neg",  "Bfly 2-10-20 -",  "SHY", "IEF", "TLH", "negative",
+     "Negative butterfly 2s10s20s: short wings (SHY+TLH), long body (IEF)"),
+    # 2s10s30s
+    ("bfly_2s10s30s_pos",  "Bfly 2-10-30 +",  "SHY", "IEF", "TLT", "positive",
      "Positive butterfly 2s10s30s: long wings (SHY+TLT), short body (IEF)"),
-    ("bfly_2s10s30s_neg", "Bfly 2-10-30 -", "SHY", "IEF", "TLT", "negative",
+    ("bfly_2s10s30s_neg",  "Bfly 2-10-30 -",  "SHY", "IEF", "TLT", "negative",
      "Negative butterfly 2s10s30s: short wings (SHY+TLT), long body (IEF)"),
-    ("bfly_5s10s30s_pos", "Bfly 5-10-30 +", "IEI", "IEF", "TLT", "positive",
+    # 2s20s30s
+    ("bfly_2s20s30s_pos",  "Bfly 2-20-30 +",  "SHY", "TLH", "TLT", "positive",
+     "Positive butterfly 2s20s30s: long wings (SHY+TLT), short body (TLH)"),
+    ("bfly_2s20s30s_neg",  "Bfly 2-20-30 -",  "SHY", "TLH", "TLT", "negative",
+     "Negative butterfly 2s20s30s: short wings (SHY+TLT), long body (TLH)"),
+    # 5s10s20s
+    ("bfly_5s10s20s_pos",  "Bfly 5-10-20 +",  "IEI", "IEF", "TLH", "positive",
+     "Positive butterfly 5s10s20s: long wings (IEI+TLH), short body (IEF)"),
+    ("bfly_5s10s20s_neg",  "Bfly 5-10-20 -",  "IEI", "IEF", "TLH", "negative",
+     "Negative butterfly 5s10s20s: short wings (IEI+TLH), long body (IEF)"),
+    # 5s10s30s
+    ("bfly_5s10s30s_pos",  "Bfly 5-10-30 +",  "IEI", "IEF", "TLT", "positive",
      "Positive butterfly 5s10s30s: long wings (IEI+TLT), short body (IEF)"),
-    ("bfly_5s10s30s_neg", "Bfly 5-10-30 -", "IEI", "IEF", "TLT", "negative",
+    ("bfly_5s10s30s_neg",  "Bfly 5-10-30 -",  "IEI", "IEF", "TLT", "negative",
      "Negative butterfly 5s10s30s: short wings (IEI+TLT), long body (IEF)"),
+    # 5s20s30s
+    ("bfly_5s20s30s_pos",  "Bfly 5-20-30 +",  "IEI", "TLH", "TLT", "positive",
+     "Positive butterfly 5s20s30s: long wings (IEI+TLT), short body (TLH)"),
+    ("bfly_5s20s30s_neg",  "Bfly 5-20-30 -",  "IEI", "TLH", "TLT", "negative",
+     "Negative butterfly 5s20s30s: short wings (IEI+TLT), long body (TLH)"),
+    # 10s20s30s
+    ("bfly_10s20s30s_pos", "Bfly 10-20-30 +", "IEF", "TLH", "TLT", "positive",
+     "Positive butterfly 10s20s30s: long wings (IEF+TLT), short body (TLH)"),
+    ("bfly_10s20s30s_neg", "Bfly 10-20-30 -", "IEF", "TLH", "TLT", "negative",
+     "Negative butterfly 10s20s30s: short wings (IEF+TLT), long body (TLH)"),
 ]
 for name, display, w1, body, w2, direction, desc in _butterflies:
     STRATEGY_POOL.append(_make_butterfly(name, display, w1, body, w2, direction, desc))
 
-# ── D) 4 Directional (baseline) ─────────────────────────────────────────
-STRATEGY_POOL.append(_make_directional(
-    "bh_tlt", "B&H TLT", {"TLT": 1.0},
-    "Buy & Hold TLT (long duration baseline)"))
+# ── D) 7 Directional (all ETFs + blend) ───────────────────────────────────
 STRATEGY_POOL.append(_make_directional(
     "bh_shv", "B&H SHV", {"SHV": 1.0},
     "Buy & Hold SHV (cash-like baseline)"))
 STRATEGY_POOL.append(_make_directional(
+    "bh_shy", "B&H SHY", {"SHY": 1.0},
+    "Buy & Hold SHY (2Y duration)"))
+STRATEGY_POOL.append(_make_directional(
+    "bh_iei", "B&H IEI", {"IEI": 1.0},
+    "Buy & Hold IEI (5Y duration)"))
+STRATEGY_POOL.append(_make_directional(
     "bh_ief", "B&H IEF", {"IEF": 1.0},
-    "Buy & Hold IEF (intermediate baseline)"))
+    "Buy & Hold IEF (10Y duration)"))
+STRATEGY_POOL.append(_make_directional(
+    "bh_tlh", "B&H TLH", {"TLH": 1.0},
+    "Buy & Hold TLH (20Y duration)"))
+STRATEGY_POOL.append(_make_directional(
+    "bh_tlt", "B&H TLT", {"TLT": 1.0},
+    "Buy & Hold TLT (30Y duration)"))
 STRATEGY_POOL.append(_make_directional(
     "bh_50_50", "50/50 TLT/SHV", {"TLT": 1.0, "SHV": 1.0},
     "50/50 TLT + SHV (balanced baseline)"))
@@ -225,4 +280,4 @@ def list_strategies(stype: str = None) -> list:
 
 
 # ── Sanity check ─────────────────────────────────────────────────────────
-assert len(STRATEGY_POOL) == 25, f"Expected 25 strategies, got {len(STRATEGY_POOL)}"
+assert len(STRATEGY_POOL) == 46, f"Expected 46 strategies, got {len(STRATEGY_POOL)}"

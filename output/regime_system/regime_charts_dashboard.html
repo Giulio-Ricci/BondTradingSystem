@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Regime Analysis Charts</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #0a0a1a; }
+    .header {
+        background: linear-gradient(135deg, #e91e63, #9c27b0);
+        color: white; padding: 18px 30px; text-align: center;
+    }
+    .header h1 { margin: 0; font-size: 22px; }
+    .header p { margin: 4px 0 0; opacity: 0.85; font-size: 13px; }
+    .tab-bar {
+        display: flex; background: #1a1a2e; padding: 0;
+        border-bottom: 3px solid #e91e63;
+    }
+    .tab-btn {
+        padding: 12px 24px; cursor: pointer; color: #aaa;
+        font-size: 14px; font-weight: bold; border: none;
+        background: transparent; transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #2a2a3e; color: white; }
+    .tab-btn.active { background: #e91e63; color: white; }
+    .tab-frame {
+        width: 100%; height: calc(100vh - 105px); border: none;
+        background: #1a1a2e;
+    }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>Regime Analysis Deep Dive</h1>
+    <p>Equity | Monthly | Regime Bars | Strategy&times;Regime | Risk-Return | Rate Level | Correlations | Rolling Best</p>
+</div>
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab(event, 0)">Strategy Equity</button>
+    <button class="tab-btn" onclick="switchTab(event, 1)">Monthly Matrix</button>
+    <button class="tab-btn" onclick="switchTab(event, 2)">Regime Bars + TLT</button>
+    <button class="tab-btn" onclick="switchTab(event, 3)">Strategy×Regime</button>
+    <button class="tab-btn" onclick="switchTab(event, 4)">Risk-Return</button>
+    <button class="tab-btn" onclick="switchTab(event, 5)">Rate Level</button>
+    <button class="tab-btn" onclick="switchTab(event, 6)">Correlations</button>
+    <button class="tab-btn" onclick="switchTab(event, 7)">Rolling Best</button>
+</div>
+<iframe id="frame0" src="regime_chart1_modes.html" class="tab-frame" style="display:block"></iframe>
+<iframe id="frame1" src="regime_chart2_monthly.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame2" src="regime_chart3_bars.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame3" src="regime_chart4_heatmap.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame4" src="regime_chart5_scatter.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame5" src="regime_chart6_rates.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame6" src="regime_chart7_corr.html" class="tab-frame" style="display:none"></iframe>
+<iframe id="frame7" src="regime_chart8_rolling.html" class="tab-frame" style="display:none"></iframe>
+
+<script>
+function switchTab(evt, idx) {
+    var frames = document.querySelectorAll('.tab-frame');
+    for (var i = 0; i < frames.length; i++) frames[i].style.display = 'none';
+    var buttons = document.querySelectorAll('.tab-btn');
+    for (var i = 0; i < buttons.length; i++) buttons[i].classList.remove('active');
+    document.getElementById('frame' + idx).style.display = 'block';
+    evt.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>
