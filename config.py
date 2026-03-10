@@ -3,7 +3,7 @@
 import os
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-DATA_DIR = r"C:\Users\Administrator\Desktop\PDFs\dati bond"
+DATA_DIR = r"C:\Users\rgiul\Desktop\PDFs\dati bond"
 SAVE_DIR = os.path.join(os.path.dirname(__file__), "output")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
